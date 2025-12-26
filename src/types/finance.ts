@@ -29,6 +29,13 @@ export type LoanDirection = 'Given' | 'Taken';
 export type LoanStatus = 'Open' | 'Partial' | 'Closed';
 
 export type AccountType = 'Savings' | 'Current' | 'Salary' | 'Fixed Deposit';
+export type WalletAccountType = 'Bank' | 'Mobile Wallet' | 'Cash';
+
+export interface AppBranding {
+  appName: string;
+  appIcon?: string; // base64 or URL
+  appLogo?: string; // base64 or URL
+}
 
 export interface Income {
   id: string;
@@ -97,9 +104,11 @@ export interface BankAccount {
   id: string;
   bankName: string;
   accountType: AccountType;
+  walletType: WalletAccountType; // Bank, Mobile Wallet, Cash
   openingBalance: number;
   currentBalance: number;
   createdAt: string;
+  isAutoSavingsAccount?: boolean;
 }
 
 export interface Transfer {
@@ -116,6 +125,8 @@ export interface Transfer {
 export interface CustomSettings {
   customExpenseCategories: string[];
   customIncomeSources: string[];
+  appBranding: AppBranding;
+  autoSavingsAccountId?: string; // ID of the account for auto savings
 }
 
 export interface MonthSummary {

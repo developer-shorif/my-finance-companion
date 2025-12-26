@@ -9,7 +9,8 @@ import {
   HandCoins,
   Wallet,
   Settings,
-  Building2
+  Building2,
+  BarChart3
 } from 'lucide-react';
 
 const navItems = [
@@ -20,6 +21,7 @@ const navItems = [
   { path: '/savings', label: 'Savings', icon: PiggyBank },
   { path: '/loans', label: 'Loans', icon: HandCoins },
   { path: '/accounts', label: 'Accounts', icon: Building2 },
+  { path: '/reports', label: 'Reports', icon: BarChart3 },
   { path: '/settings', label: 'Settings', icon: Settings },
 ];
 
