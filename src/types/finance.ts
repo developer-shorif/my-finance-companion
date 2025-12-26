@@ -28,11 +28,13 @@ export type SavingsAccount = 'Cash' | 'Bank' | 'Mobile Wallet';
 export type LoanDirection = 'Given' | 'Taken';
 export type LoanStatus = 'Open' | 'Partial' | 'Closed';
 
+export type AccountType = 'Savings' | 'Current' | 'Salary' | 'Fixed Deposit';
+
 export interface Income {
   id: string;
   date: string;
   month: string; // mmm-yyyy
-  source: IncomeSource;
+  source: string; // Now supports custom sources
   type: IncomeType;
   grossIncome: number;
   autoSavings: number; // 20% of gross
@@ -45,11 +47,12 @@ export interface Expense {
   date: string;
   month: string;
   expenseType: ExpenseType;
-  category: ExpenseCategory;
+  category: string; // Now supports custom categories
   subCategory: string;
   amount: number;
   paidBy: PaymentMethod;
   note: string;
+  responsibility?: string; // Person responsible
 }
 
 export interface Budget {
@@ -90,6 +93,31 @@ export interface Loan {
   note: string;
 }
 
+export interface BankAccount {
+  id: string;
+  bankName: string;
+  accountType: AccountType;
+  openingBalance: number;
+  currentBalance: number;
+  createdAt: string;
+}
+
+export interface Transfer {
+  id: string;
+  date: string;
+  fromType: 'bank' | 'cash';
+  toType: 'bank' | 'cash';
+  fromBankId?: string; // If from bank
+  toBankId?: string; // If to bank
+  amount: number;
+  note: string;
+}
+
+export interface CustomSettings {
+  customExpenseCategories: string[];
+  customIncomeSources: string[];
+}
+
 export interface MonthSummary {
   month: string;
   totalGrossIncome: number;
@@ -101,6 +129,8 @@ export interface MonthSummary {
   totalLoanReceivable: number;
   totalLoanPayable: number;
   netWorth: number;
+  totalBankBalance: number;
+  totalCashBalance: number;
 }
 
 export interface FinanceData {
@@ -109,4 +139,8 @@ export interface FinanceData {
   budgets: Budget[];
   savings: SavingsEntry[];
   loans: Loan[];
+  bankAccounts: BankAccount[];
+  transfers: Transfer[];
+  cashBalance: number;
+  customSettings: CustomSettings;
 }

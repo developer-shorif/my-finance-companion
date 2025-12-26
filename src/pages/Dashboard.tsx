@@ -31,7 +31,9 @@ const Dashboard: React.FC = () => {
     data.budgets,
     data.savings,
     data.loans,
-    selectedMonth
+    selectedMonth,
+    data.bankAccounts,
+    data.cashBalance
   );
 
   const budgetsWithActual = getBudgetsWithActual(data.budgets, data.expenses, selectedMonth);

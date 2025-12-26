@@ -7,7 +7,9 @@ import {
   Target, 
   PiggyBank, 
   HandCoins,
-  Wallet
+  Wallet,
+  Settings,
+  Building2
 } from 'lucide-react';
 
 const navItems = [
@@ -17,13 +19,15 @@ const navItems = [
   { path: '/budget', label: 'Budget', icon: Target },
   { path: '/savings', label: 'Savings', icon: PiggyBank },
   { path: '/loans', label: 'Loans', icon: HandCoins },
+  { path: '/accounts', label: 'Accounts', icon: Building2 },
+  { path: '/settings', label: 'Settings', icon: Settings },
 ];
 
 export const Sidebar: React.FC = () => {
   const location = useLocation();
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-64 border-r border-border bg-sidebar flex flex-col">
+    <aside className="fixed left-0 top-0 h-screen w-64 border-r border-border bg-sidebar flex flex-col hidden lg:flex">
       {/* Logo */}
       <div className="flex items-center gap-3 px-6 py-6 border-b border-border">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl gradient-primary">

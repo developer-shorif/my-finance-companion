@@ -5,7 +5,10 @@ import type {
   Expense, 
   Budget, 
   SavingsEntry, 
-  Loan 
+  Loan,
+  BankAccount,
+  Transfer,
+  CustomSettings
 } from '@/types/finance';
 import { generateId, formatMonth, calculateAutoSavings, calculateUsableIncome } from '@/lib/financeUtils';
 
@@ -13,41 +16,111 @@ interface FinanceContextType {
   data: FinanceData;
   selectedMonth: string;
   setSelectedMonth: (month: string) => void;
+  // Income
   addIncome: (income: Omit<Income, 'id' | 'month' | 'autoSavings' | 'usableIncome'>) => void;
   updateIncome: (id: string, income: Partial<Income>) => void;
   deleteIncome: (id: string) => void;
+  // Expense
   addExpense: (expense: Omit<Expense, 'id' | 'month'>) => void;
   updateExpense: (id: string, expense: Partial<Expense>) => void;
   deleteExpense: (id: string) => void;
+  // Budget
   addBudget: (budget: Omit<Budget, 'id'>) => void;
   updateBudget: (id: string, budget: Partial<Budget>) => void;
   deleteBudget: (id: string) => void;
+  // Savings
   addSavings: (savings: Omit<SavingsEntry, 'id'>) => void;
   updateSavings: (id: string, savings: Partial<SavingsEntry>) => void;
   deleteSavings: (id: string) => void;
+  // Loans
   addLoan: (loan: Omit<Loan, 'id'>) => void;
   updateLoan: (id: string, loan: Partial<Loan>) => void;
   deleteLoan: (id: string) => void;
+  // Bank Accounts
+  addBankAccount: (account: Omit<BankAccount, 'id' | 'currentBalance' | 'createdAt'>) => void;
+  updateBankAccount: (id: string, account: Partial<BankAccount>) => void;
+  deleteBankAccount: (id: string) => void;
+  // Transfers
+  addTransfer: (transfer: Omit<Transfer, 'id'>) => void;
+  // Cash
+  setCashBalance: (balance: number) => void;
+  adjustCashBalance: (amount: number) => void;
+  // Custom Settings
+  addCustomExpenseCategory: (category: string) => void;
+  removeCustomExpenseCategory: (category: string) => void;
+  addCustomIncomeSource: (source: string) => void;
+  removeCustomIncomeSource: (source: string) => void;
+  // Helpers
+  getTotalBankBalance: () => number;
+  getAllExpenseCategories: () => string[];
+  getAllIncomeSources: () => string[];
 }
 
 const FinanceContext = createContext<FinanceContextType | null>(null);
 
 const STORAGE_KEY = 'finance_data';
 
+const defaultCustomSettings: CustomSettings = {
+  customExpenseCategories: [],
+  customIncomeSources: [],
+};
+
 const getInitialData = (): FinanceData => {
   if (typeof window === 'undefined') {
-    return { incomes: [], expenses: [], budgets: [], savings: [], loans: [] };
+    return { 
+      incomes: [], 
+      expenses: [], 
+      budgets: [], 
+      savings: [], 
+      loans: [],
+      bankAccounts: [],
+      transfers: [],
+      cashBalance: 0,
+      customSettings: defaultCustomSettings,
+    };
   }
   
   const stored = localStorage.getItem(STORAGE_KEY);
   if (stored) {
     try {
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      // Ensure new fields exist for backwards compatibility
+      return {
+        incomes: parsed.incomes || [],
+        expenses: parsed.expenses || [],
+        budgets: parsed.budgets || [],
+        savings: parsed.savings || [],
+        loans: parsed.loans || [],
+        bankAccounts: parsed.bankAccounts || [],
+        transfers: parsed.transfers || [],
+        cashBalance: parsed.cashBalance || 0,
+        customSettings: parsed.customSettings || defaultCustomSettings,
+      };
     } catch {
-      return { incomes: [], expenses: [], budgets: [], savings: [], loans: [] };
+      return { 
+        incomes: [], 
+        expenses: [], 
+        budgets: [], 
+        savings: [], 
+        loans: [],
+        bankAccounts: [],
+        transfers: [],
+        cashBalance: 0,
+        customSettings: defaultCustomSettings,
+      };
     }
   }
-  return { incomes: [], expenses: [], budgets: [], savings: [], loans: [] };
+  return { 
+    incomes: [], 
+    expenses: [], 
+    budgets: [], 
+    savings: [], 
+    loans: [],
+    bankAccounts: [],
+    transfers: [],
+    cashBalance: 0,
+    customSettings: defaultCustomSettings,
+  };
 };
 
 export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -110,7 +183,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return updated;
       });
 
-      // Update linked savings entry
       const updatedIncome = incomes.find(i => i.id === id);
       const savings = prev.savings.map(s => {
         if (s.linkedIncomeId === id && updatedIncome) {
@@ -206,6 +278,134 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setData(prev => ({ ...prev, loans: prev.loans.filter(l => l.id !== id) }));
   }, []);
 
+  // Bank Account methods
+  const addBankAccount = useCallback((accountData: Omit<BankAccount, 'id' | 'currentBalance' | 'createdAt'>) => {
+    const account: BankAccount = {
+      ...accountData,
+      id: generateId(),
+      currentBalance: accountData.openingBalance,
+      createdAt: new Date().toISOString(),
+    };
+    setData(prev => ({ ...prev, bankAccounts: [...prev.bankAccounts, account] }));
+  }, []);
+
+  const updateBankAccount = useCallback((id: string, updates: Partial<BankAccount>) => {
+    setData(prev => ({
+      ...prev,
+      bankAccounts: prev.bankAccounts.map(a => a.id === id ? { ...a, ...updates } : a),
+    }));
+  }, []);
+
+  const deleteBankAccount = useCallback((id: string) => {
+    setData(prev => ({ ...prev, bankAccounts: prev.bankAccounts.filter(a => a.id !== id) }));
+  }, []);
+
+  // Transfer method - updates balances automatically
+  const addTransfer = useCallback((transferData: Omit<Transfer, 'id'>) => {
+    const transfer: Transfer = { ...transferData, id: generateId() };
+    
+    setData(prev => {
+      let cashBalance = prev.cashBalance;
+      const bankAccounts = [...prev.bankAccounts];
+
+      // From source
+      if (transferData.fromType === 'cash') {
+        cashBalance -= transferData.amount;
+      } else if (transferData.fromBankId) {
+        const fromIdx = bankAccounts.findIndex(a => a.id === transferData.fromBankId);
+        if (fromIdx !== -1) {
+          bankAccounts[fromIdx] = {
+            ...bankAccounts[fromIdx],
+            currentBalance: bankAccounts[fromIdx].currentBalance - transferData.amount,
+          };
+        }
+      }
+
+      // To destination
+      if (transferData.toType === 'cash') {
+        cashBalance += transferData.amount;
+      } else if (transferData.toBankId) {
+        const toIdx = bankAccounts.findIndex(a => a.id === transferData.toBankId);
+        if (toIdx !== -1) {
+          bankAccounts[toIdx] = {
+            ...bankAccounts[toIdx],
+            currentBalance: bankAccounts[toIdx].currentBalance + transferData.amount,
+          };
+        }
+      }
+
+      return {
+        ...prev,
+        transfers: [...prev.transfers, transfer],
+        bankAccounts,
+        cashBalance,
+      };
+    });
+  }, []);
+
+  const setCashBalance = useCallback((balance: number) => {
+    setData(prev => ({ ...prev, cashBalance: balance }));
+  }, []);
+
+  const adjustCashBalance = useCallback((amount: number) => {
+    setData(prev => ({ ...prev, cashBalance: prev.cashBalance + amount }));
+  }, []);
+
+  // Custom settings methods
+  const addCustomExpenseCategory = useCallback((category: string) => {
+    setData(prev => ({
+      ...prev,
+      customSettings: {
+        ...prev.customSettings,
+        customExpenseCategories: [...prev.customSettings.customExpenseCategories, category],
+      },
+    }));
+  }, []);
+
+  const removeCustomExpenseCategory = useCallback((category: string) => {
+    setData(prev => ({
+      ...prev,
+      customSettings: {
+        ...prev.customSettings,
+        customExpenseCategories: prev.customSettings.customExpenseCategories.filter(c => c !== category),
+      },
+    }));
+  }, []);
+
+  const addCustomIncomeSource = useCallback((source: string) => {
+    setData(prev => ({
+      ...prev,
+      customSettings: {
+        ...prev.customSettings,
+        customIncomeSources: [...prev.customSettings.customIncomeSources, source],
+      },
+    }));
+  }, []);
+
+  const removeCustomIncomeSource = useCallback((source: string) => {
+    setData(prev => ({
+      ...prev,
+      customSettings: {
+        ...prev.customSettings,
+        customIncomeSources: prev.customSettings.customIncomeSources.filter(s => s !== source),
+      },
+    }));
+  }, []);
+
+  const getTotalBankBalance = useCallback(() => {
+    return data.bankAccounts.reduce((sum, a) => sum + a.currentBalance, 0);
+  }, [data.bankAccounts]);
+
+  const getAllExpenseCategories = useCallback(() => {
+    const defaults = ['Food', 'Rent', 'Transport', 'Utility', 'EMI', 'Medical', 'Entertainment', 'Shopping', 'Other'];
+    return [...defaults, ...data.customSettings.customExpenseCategories];
+  }, [data.customSettings.customExpenseCategories]);
+
+  const getAllIncomeSources = useCallback(() => {
+    const defaults = ['Client', 'Salary', 'Business', 'Other'];
+    return [...defaults, ...data.customSettings.customIncomeSources];
+  }, [data.customSettings.customIncomeSources]);
+
   return (
     <FinanceContext.Provider value={{
       data,
@@ -226,6 +426,19 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       addLoan,
       updateLoan,
       deleteLoan,
+      addBankAccount,
+      updateBankAccount,
+      deleteBankAccount,
+      addTransfer,
+      setCashBalance,
+      adjustCashBalance,
+      addCustomExpenseCategory,
+      removeCustomExpenseCategory,
+      addCustomIncomeSource,
+      removeCustomIncomeSource,
+      getTotalBankBalance,
+      getAllExpenseCategories,
+      getAllIncomeSources,
     }}>
       {children}
     </FinanceContext.Provider>
