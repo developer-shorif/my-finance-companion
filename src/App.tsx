@@ -10,6 +10,9 @@ import ExpensesPage from "./pages/ExpensesPage";
 import BudgetPage from "./pages/BudgetPage";
 import SavingsPage from "./pages/SavingsPage";
 import LoansPage from "./pages/LoansPage";
+import AccountsPage from "./pages/AccountsPage";
+import SettingsPage from "./pages/SettingsPage";
+import AddPage from "./pages/AddPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +31,9 @@ const App = () => (
             <Route path="/budget" element={<BudgetPage />} />
             <Route path="/savings" element={<SavingsPage />} />
             <Route path="/loans" element={<LoansPage />} />
+            <Route path="/accounts" element={<AccountsPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/add" element={<AddPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

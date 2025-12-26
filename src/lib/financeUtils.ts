@@ -5,7 +5,8 @@ import type {
   Budget, 
   BudgetWithActual, 
   SavingsEntry, 
-  Loan, 
+  Loan,
+  BankAccount,
   MonthSummary,
   ExpenseType 
 } from '@/types/finance';
@@ -85,6 +86,10 @@ export const calculateSavingsBalance = (savings: SavingsEntry[]): number => {
   return savings.reduce((balance, entry) => balance + entry.inAmount - entry.outAmount, 0);
 };
 
+export const calculateTotalBankBalance = (bankAccounts: BankAccount[]): number => {
+  return bankAccounts.reduce((sum, a) => sum + a.currentBalance, 0);
+};
+
 export const calculatePersonLoanBalance = (loans: Loan[], personName: string): number => {
   return loans
     .filter(l => l.personName === personName)
@@ -115,7 +120,9 @@ export const getMonthSummary = (
   budgets: Budget[],
   savings: SavingsEntry[],
   loans: Loan[],
-  month: string
+  month: string,
+  bankAccounts: BankAccount[] = [],
+  cashBalance: number = 0
 ): MonthSummary => {
   const monthlyIncomes = getMonthlyIncomes(incomes, month);
   const monthlyExpenses = getMonthlyExpenses(expenses, month);
@@ -131,7 +138,9 @@ export const getMonthSummary = (
   const totalLoanReceivable = getTotalLoanReceivable(loans);
   const totalLoanPayable = getTotalLoanPayable(loans);
   const savingsBalance = calculateSavingsBalance(savings);
-  const netWorth = savingsBalance + totalLoanReceivable - totalLoanPayable;
+  const totalBankBalance = calculateTotalBankBalance(bankAccounts);
+  const totalCashBalance = cashBalance;
+  const netWorth = savingsBalance + totalBankBalance + totalCashBalance + totalLoanReceivable - totalLoanPayable;
 
   return {
     month,
@@ -144,6 +153,8 @@ export const getMonthSummary = (
     totalLoanReceivable,
     totalLoanPayable,
     netWorth,
+    totalBankBalance,
+    totalCashBalance,
   };
 };
 
@@ -181,4 +192,64 @@ export const getYearlySummary = (
     });
   }
   return months;
+};
+
+// Filter expenses by type and/or person
+export const getFilteredExpenses = (
+  expenses: Expense[],
+  month: string,
+  expenseType?: ExpenseType,
+  responsibility?: string
+): Expense[] => {
+  return expenses.filter(e => {
+    if (e.month !== month) return false;
+    if (expenseType && e.expenseType !== expenseType) return false;
+    if (responsibility && e.responsibility !== responsibility) return false;
+    return true;
+  });
+};
+
+// Get expense breakdown by category
+export const getExpensesByCategory = (
+  expenses: Expense[],
+  month: string
+): { category: string; amount: number }[] => {
+  const monthlyExpenses = getMonthlyExpenses(expenses, month);
+  const categoryMap = new Map<string, number>();
+  
+  monthlyExpenses.forEach(e => {
+    const current = categoryMap.get(e.category) || 0;
+    categoryMap.set(e.category, current + e.amount);
+  });
+  
+  return Array.from(categoryMap.entries())
+    .map(([category, amount]) => ({ category, amount }))
+    .sort((a, b) => b.amount - a.amount);
+};
+
+// Get expense breakdown by expense type
+export const getExpensesByType = (
+  expenses: Expense[],
+  month: string
+): { type: ExpenseType; amount: number }[] => {
+  const monthlyExpenses = getMonthlyExpenses(expenses, month);
+  const typeMap = new Map<ExpenseType, number>();
+  
+  monthlyExpenses.forEach(e => {
+    const current = typeMap.get(e.expenseType) || 0;
+    typeMap.set(e.expenseType, current + e.amount);
+  });
+  
+  return Array.from(typeMap.entries())
+    .map(([type, amount]) => ({ type, amount }))
+    .sort((a, b) => b.amount - a.amount);
+};
+
+// Get unique persons from expenses
+export const getUniquePersons = (expenses: Expense[]): string[] => {
+  const persons = new Set<string>();
+  expenses.forEach(e => {
+    if (e.responsibility) persons.add(e.responsibility);
+  });
+  return Array.from(persons).sort();
 };
