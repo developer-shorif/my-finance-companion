@@ -12,8 +12,6 @@ import type {
 } from '@/types/finance';
 import { generateId, formatMonth, calculateAutoSavings, calculateUsableIncome } from '@/lib/financeUtils';
 
-import type { AppBranding } from '@/types/finance';
-
 interface FinanceContextType {
   data: FinanceData;
   selectedMonth: string;
@@ -52,14 +50,10 @@ interface FinanceContextType {
   removeCustomExpenseCategory: (category: string) => void;
   addCustomIncomeSource: (source: string) => void;
   removeCustomIncomeSource: (source: string) => void;
-  // Branding
-  updateAppBranding: (branding: Partial<AppBranding>) => void;
-  setAutoSavingsAccount: (accountId: string | undefined) => void;
   // Helpers
   getTotalBankBalance: () => number;
   getAllExpenseCategories: () => string[];
   getAllIncomeSources: () => string[];
-  getAutoSavingsAccount: () => BankAccount | undefined;
 }
 
 const FinanceContext = createContext<FinanceContextType | null>(null);
@@ -69,10 +63,6 @@ const STORAGE_KEY = 'finance_data';
 const defaultCustomSettings: CustomSettings = {
   customExpenseCategories: [],
   customIncomeSources: [],
-  appBranding: {
-    appName: 'FinanceFlow',
-  },
-  autoSavingsAccountId: undefined,
 };
 
 const getInitialData = (): FinanceData => {
@@ -142,7 +132,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [data]);
 
   // Auto-create savings entry when income is added
-  const createAutoSavingsEntry = useCallback((income: Income, autoSavingsAccountId?: string) => {
+  const createAutoSavingsEntry = useCallback((income: Income) => {
     const savingsEntry: SavingsEntry = {
       id: generateId(),
       date: income.date,
@@ -153,7 +143,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       purpose: `Auto savings from ${income.source} income`,
       linkedIncomeId: income.id,
     };
-    return { savingsEntry, autoSavingsAccountId };
+    return savingsEntry;
   }, []);
 
   const addIncome = useCallback((incomeData: Omit<Income, 'id' | 'month' | 'autoSavings' | 'usableIncome'>) => {
@@ -168,29 +158,15 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       usableIncome,
     };
 
-    const { savingsEntry } = createAutoSavingsEntry(income);
-    const autoSavingsAccountId = data.customSettings.autoSavingsAccountId;
+    const savingsEntry = createAutoSavingsEntry(income);
 
-    setData(prev => {
-      let bankAccounts = prev.bankAccounts;
-      
-      // If auto savings account is set, add the auto savings amount to that account
-      if (autoSavingsAccountId) {
-        bankAccounts = prev.bankAccounts.map(acc => 
-          acc.id === autoSavingsAccountId 
-            ? { ...acc, currentBalance: acc.currentBalance + autoSavings }
-            : acc
-        );
-      }
+    setData(prev => ({
+      ...prev,
+      incomes: [...prev.incomes, income],
+      savings: [...prev.savings, savingsEntry],
+    }));
+  }, [createAutoSavingsEntry]);
 
-      return {
-        ...prev,
-        incomes: [...prev.incomes, income],
-        savings: [...prev.savings, savingsEntry],
-        bankAccounts,
-      };
-    });
-  }, [createAutoSavingsEntry, data.customSettings.autoSavingsAccountId]);
   const updateIncome = useCallback((id: string, updates: Partial<Income>) => {
     setData(prev => {
       const incomes = prev.incomes.map(income => {
@@ -416,26 +392,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }));
   }, []);
 
-  const updateAppBranding = useCallback((branding: Partial<AppBranding>) => {
-    setData(prev => ({
-      ...prev,
-      customSettings: {
-        ...prev.customSettings,
-        appBranding: { ...prev.customSettings.appBranding, ...branding },
-      },
-    }));
-  }, []);
-
-  const setAutoSavingsAccount = useCallback((accountId: string | undefined) => {
-    setData(prev => ({
-      ...prev,
-      customSettings: {
-        ...prev.customSettings,
-        autoSavingsAccountId: accountId,
-      },
-    }));
-  }, []);
-
   const getTotalBankBalance = useCallback(() => {
     return data.bankAccounts.reduce((sum, a) => sum + a.currentBalance, 0);
   }, [data.bankAccounts]);
@@ -449,10 +405,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const defaults = ['Client', 'Salary', 'Business', 'Other'];
     return [...defaults, ...data.customSettings.customIncomeSources];
   }, [data.customSettings.customIncomeSources]);
-
-  const getAutoSavingsAccount = useCallback(() => {
-    return data.bankAccounts.find(acc => acc.id === data.customSettings.autoSavingsAccountId);
-  }, [data.bankAccounts, data.customSettings.autoSavingsAccountId]);
 
   return (
     <FinanceContext.Provider value={{
@@ -484,12 +436,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       removeCustomExpenseCategory,
       addCustomIncomeSource,
       removeCustomIncomeSource,
-      updateAppBranding,
-      setAutoSavingsAccount,
       getTotalBankBalance,
       getAllExpenseCategories,
       getAllIncomeSources,
-      getAutoSavingsAccount,
     }}>
       {children}
     </FinanceContext.Provider>
